@@ -7,17 +7,19 @@ import MaxContentWidthOptions from "./options/appearance/max_content_width.js";
 import KeyboardShortcutsOptions from "./options/shortcuts.js";
 import HeadingStyleOptions from "./options/text_notes/heading_style.js";
 import TableOfContentsOptions from "./options/text_notes/table_of_contents.js";
+import HighlightsListOptions from "./options/text_notes/highlights_list.js";
 import TextAutoReadOnlySizeOptions from "./options/text_notes/text_auto_read_only_size.js";
 import VimKeyBindingsOptions from "./options/code_notes/vim_key_bindings.js";
 import WrapLinesOptions from "./options/code_notes/wrap_lines.js";
 import CodeAutoReadOnlySizeOptions from "./options/code_notes/code_auto_read_only_size.js";
 import CodeMimeTypesOptions from "./options/code_notes/code_mime_types.js";
-import ImageOptions from "./options/images.js";
+import ImageOptions from "./options/images/images.js";
 import SpellcheckOptions from "./options/spellcheck.js";
 import PasswordOptions from "./options/password.js";
 import EtapiOptions from "./options/etapi.js";
 import BackupOptions from "./options/backup.js";
 import SyncOptions from "./options/sync.js";
+import SearchEngineOptions from "./options/other/search_engine.js";
 import TrayOptions from "./options/other/tray.js";
 import NoteErasureTimeoutOptions from "./options/other/note_erasure_timeout.js";
 import NoteRevisionsSnapshotIntervalOptions from "./options/other/note_revisions_snapshot_interval.js";
@@ -60,6 +62,7 @@ const CONTENT_WIDGETS = {
     _optionsTextNotes: [
         HeadingStyleOptions,
         TableOfContentsOptions,
+        HighlightsListOptions,
         TextAutoReadOnlySizeOptions
     ],
     _optionsCodeNotes: [
@@ -75,6 +78,7 @@ const CONTENT_WIDGETS = {
     _optionsBackup: [ BackupOptions ],
     _optionsSync: [ SyncOptions ],
     _optionsOther: [
+        SearchEngineOptions,
         TrayOptions,
         NoteErasureTimeoutOptions,
         NoteRevisionsSnapshotIntervalOptions,

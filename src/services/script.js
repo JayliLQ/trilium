@@ -55,7 +55,7 @@ ${bundle.script}\r
 }
 
 /**
- * THIS METHOD CANT BE ASYNC, OTHERWISE TRANSACTION WRAPPER WON'T BE EFFECTIVE AND WE WILL BE LOSING THE
+ * THIS METHOD CAN'T BE ASYNC, OTHERWISE TRANSACTION WRAPPER WON'T BE EFFECTIVE AND WE WILL BE LOSING THE
  * ENTITY CHANGES IN CLS.
  *
  * This method preserves frontend startNode - that's why we start execution from currentNote and override
@@ -66,8 +66,8 @@ function executeScript(script, params, startNoteId, currentNoteId, originEntityN
     const currentNote = becca.getNote(currentNoteId);
     const originEntity = becca.getEntity(originEntityName, originEntityId);
 
-    // we're just executing an excerpt of the original frontend script in the backend context so we must
-    // override normal note's content and it's mime type / script environment
+    // we're just executing an excerpt of the original frontend script in the backend context, so we must
+    // override normal note's content, and it's mime type / script environment
     const backendOverrideContent = `return (${script}\r\n)(${getParams(params)})`;
 
     const bundle = getScriptBundle(currentNote, true, null, [], backendOverrideContent);
@@ -125,7 +125,7 @@ function getScriptBundle(note, root = true, scriptEnv = null, includedNoteIds = 
     }
 
     if (root) {
-        scriptEnv = !!backendOverrideContent
+        scriptEnv = backendOverrideContent
             ? 'backend'
             : note.getScriptEnv();
     }

@@ -44,12 +44,11 @@ import BacklinksWidget from "../widgets/floating_buttons/zpetne_odkazy.js";
 import SharedInfoWidget from "../widgets/shared_info.js";
 import FindWidget from "../widgets/find.js";
 import TocWidget from "../widgets/toc.js";
+import HighlightsListWidget from "../widgets/highlights_list.js";
 import BulkActionsDialog from "../widgets/dialogs/bulk_actions.js";
 import AboutDialog from "../widgets/dialogs/about.js";
-import NoteSourceDialog from "../widgets/dialogs/note_source.js";
 import HelpDialog from "../widgets/dialogs/help.js";
 import RecentChangesDialog from "../widgets/dialogs/recent_changes.js";
-import BackendLogDialog from "../widgets/dialogs/backend_log.js";
 import BranchPrefixDialog from "../widgets/dialogs/branch_prefix.js";
 import SortChildNotesDialog from "../widgets/dialogs/sort_child_notes.js";
 import PasswordNoteSetDialog from "../widgets/dialogs/password_not_set.js";
@@ -77,6 +76,7 @@ import CodeButtonsWidget from "../widgets/floating_buttons/code_buttons.js";
 import ApiLogWidget from "../widgets/api_log.js";
 import HideFloatingButtonsButton from "../widgets/floating_buttons/hide_floating_buttons_button.js";
 import ScriptExecutorWidget from "../widgets/ribbon_widgets/script_executor.js";
+import MovePaneButton from "../widgets/buttons/move_pane_button.js";
 
 export default class DesktopLayout {
     constructor(customWidgets) {
@@ -125,11 +125,17 @@ export default class DesktopLayout {
                                         .child(new NoteIconWidget())
                                         .child(new NoteTitleWidget())
                                         .child(new SpacerWidget(0, 1))
+                                        .child(new MovePaneButton(true))
+                                        .child(new MovePaneButton(false))
                                         .child(new ClosePaneButton())
                                         .child(new CreatePaneButton())
                                     )
                                     .child(
                                         new RibbonContainer()
+                                            // order of the widgets matter. Some of these want to "activate" themselves
+                                            // when visible, when this happens to multiple of them, the first one "wins".
+                                            // promoted attributes should always win.
+                                            .ribbon(new PromotedAttributesWidget())
                                             .ribbon(new ScriptExecutorWidget())
                                             .ribbon(new SearchDefinitionWidget())
                                             .ribbon(new EditedNotesWidget())
@@ -137,7 +143,6 @@ export default class DesktopLayout {
                                             .ribbon(new NotePropertiesWidget())
                                             .ribbon(new FilePropertiesWidget())
                                             .ribbon(new ImagePropertiesWidget())
-                                            .ribbon(new PromotedAttributesWidget())
                                             .ribbon(new BasicPropertiesWidget())
                                             .ribbon(new OwnedAttributeListWidget())
                                             .ribbon(new InheritedAttributesWidget())
@@ -180,16 +185,15 @@ export default class DesktopLayout {
                     )
                     .child(new RightPaneContainer()
                         .child(new TocWidget())
+                        .child(new HighlightsListWidget())
                         .child(...this.customWidgets.get('right-pane'))
                     )
                 )
             )
             .child(new BulkActionsDialog())
             .child(new AboutDialog())
-            .child(new NoteSourceDialog())
             .child(new HelpDialog())
             .child(new RecentChangesDialog())
-            .child(new BackendLogDialog())
             .child(new BranchPrefixDialog())
             .child(new SortChildNotesDialog())
             .child(new PasswordNoteSetDialog())

@@ -35,7 +35,8 @@ export default class MermaidWidget extends NoteContextAwareWidget {
     isEnabled() {
         return super.isEnabled()
             && this.note?.type === 'mermaid'
-            && this.note.isContentAvailable();
+            && this.note.isContentAvailable()
+            && this.noteContext?.viewScope.viewMode === 'default';
     }
 
     doRender() {
@@ -72,6 +73,8 @@ export default class MermaidWidget extends NoteContextAwareWidget {
 
         const wheelZoomLoaded = libraryLoader.requireLibrary(libraryLoader.WHEEL_ZOOM);
 
+        this.$errorContainer.hide();
+
         try {
             await this.renderSvg(async renderedSvg => {
                 this.$display.html(renderedSvg);
@@ -86,8 +89,6 @@ export default class MermaidWidget extends NoteContextAwareWidget {
                     speed: 20,
                     zoomOnClick: false
                 });
-
-                this.$errorContainer.hide();
             });
         } catch (e) {
             this.$errorMessage.text(e.message);

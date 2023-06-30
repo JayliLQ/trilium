@@ -1,6 +1,5 @@
 import server from "../../services/server.js";
 import froca from "../../services/froca.js";
-import treeService from "../../services/tree.js";
 import linkService from "../../services/link.js";
 import attributeAutocompleteService from "../../services/attribute_autocomplete.js";
 import noteAutocompleteService from "../../services/note_autocomplete.js";
@@ -9,6 +8,7 @@ import NoteContextAwareWidget from "../note_context_aware_widget.js";
 import SpacedUpdate from "../../services/spaced_update.js";
 import utils from "../../services/utils.js";
 import shortcutService from "../../services/shortcuts.js";
+import appContext from "../../components/app_context.js";
 
 const TPL = `
 <div class="attr-detail">
@@ -242,7 +242,8 @@ const ATTR_HELP = {
         "keepCurrentHoisting": "Opening this link won't change hoisting even if the note is not displayable in the current hoisted subtree.",
         "executeButton": "Title of the button which will execute the current code note",
         "executeDescription": "Longer description of the current code note displayed together with the execute button",
-        "excludeFromNoteMap": "Notes with this label will be hidden from the Note Map"
+        "excludeFromNoteMap": "Notes with this label will be hidden from the Note Map",
+        "newNotesOnTop": "New notes will be created at the top of the parent note, not on the bottom."
     },
     "relation": {
         "runOnNoteCreation": "executes when note is created on backend. Use this relation if you want to run the script for all notes created under a specific subtree. In that case, create it on the subtree root note and make it inheritable. A new note created within the subtree (any depth) will trigger the script.",
@@ -255,7 +256,8 @@ const ATTR_HELP = {
         "runOnBranchDeletion": "executes when a branch is deleted. Branch is a link between parent note and child note and is deleted e.g. when moving note (old branch/link is deleted).",
         "runOnAttributeCreation": "executes when new attribute is created for the note which defines this relation",
         "runOnAttributeChange": " executes when the attribute is changed of a note which defines this relation. This is triggered also when the attribute is deleted",
-        "template": "attached note's attributes will be inherited even without parent-child relationship. See template for details.",
+        "template": "note's attributes will be inherited even without a parent-child relationship, note's content and subtree will be added to instance notes if empty. See documentation for details.",
+        "inherit": "note's attributes will be inherited even without a parent-child relationship. See template relation for a similar concept. See attribute inheritance in the documentation.",
         "renderNote": 'notes of type "render HTML note" will be rendered using a code note (HTML or script) and it is necessary to point using this relation to which note should be rendered',
         "widget": "target of this relation will be executed and rendered as a widget in the sidebar",
         "shareCss": "CSS note which will be injected into the share page. CSS note must be in the shared sub-tree as well. Consider using 'shareHiddenFromTree' and 'shareOmitDefaultCss' as well.",
@@ -283,7 +285,11 @@ export default class AttributeDetailWidget extends NoteContextAwareWidget {
         this.$title = this.$widget.find('.attr-detail-title');
 
         this.$inputName = this.$widget.find('.attr-input-name');
-        this.$inputName.on('keyup', () => this.userEditedAttribute());
+        this.$inputName.on('input', ev => {
+            if (!ev.originalEvent?.isComposing) { // https://github.com/zadam/trilium/pull/3812
+                this.userEditedAttribute();
+            }
+        });
         this.$inputName.on('change', () => this.userEditedAttribute());
         this.$inputName.on('autocomplete:closed', () => this.userEditedAttribute());
 
@@ -297,7 +303,11 @@ export default class AttributeDetailWidget extends NoteContextAwareWidget {
 
         this.$rowValue = this.$widget.find('.attr-row-value');
         this.$inputValue = this.$widget.find('.attr-input-value');
-        this.$inputValue.on('keyup', () => this.userEditedAttribute());
+        this.$inputValue.on('input', ev => {
+            if (!ev.originalEvent?.isComposing) { // https://github.com/zadam/trilium/pull/3812
+                this.userEditedAttribute();
+            }
+        });
         this.$inputValue.on('change', () => this.userEditedAttribute());
         this.$inputValue.on('autocomplete:closed', () => this.userEditedAttribute());
         this.$inputValue.on('focus', () => {
@@ -326,7 +336,11 @@ export default class AttributeDetailWidget extends NoteContextAwareWidget {
 
         this.$rowInverseRelation = this.$widget.find('.attr-row-inverse-relation');
         this.$inputInverseRelation = this.$widget.find('.attr-input-inverse-relation');
-        this.$inputInverseRelation.on('keyup', () => this.userEditedAttribute());
+        this.$inputInverseRelation.on('input', ev => {
+            if (!ev.originalEvent?.isComposing) { // https://github.com/zadam/trilium/pull/3812
+                this.userEditedAttribute();
+            }
+        });
 
         this.$rowTargetNote = this.$widget.find('.attr-row-target-note');
         this.$inputTargetNote = this.$widget.find('.attr-input-target-note');
@@ -584,9 +598,10 @@ export default class AttributeDetailWidget extends NoteContextAwareWidget {
 
             const displayedResults = results.length <= DISPLAYED_NOTES ? results : results.slice(0, DISPLAYED_NOTES);
             const displayedNotes = await froca.getNotes(displayedResults.map(res => res.noteId));
+            const hoistedNoteId = appContext.tabManager.getActiveContext()?.hoistedNoteId;
 
             for (const note of displayedNotes) {
-                const notePath = treeService.getSomeNotePath(note);
+                const notePath = note.getBestNotePathString(hoistedNoteId);
                 const $noteLink = await linkService.createNoteLink(notePath, {showNotePath: true});
 
                 this.$relatedNotesList.append(

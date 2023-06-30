@@ -74,16 +74,16 @@ export default class NoteDetailWidget extends NoteContextAwareWidget {
             const {note} = this.noteContext;
             const {noteId} = note;
 
-            const content = await this.getTypeWidget().getContent();
+            const data = await this.getTypeWidget().getData();
 
             // for read only notes
-            if (content === undefined) {
+            if (data === undefined) {
                 return;
             }
 
             protectedSessionHolder.touchProtectedSessionIfNecessary(note);
 
-            await server.put(`notes/${noteId}/content`, {content}, this.componentId);
+            await server.put(`notes/${noteId}/data`, data, this.componentId);
         });
 
         appContext.addBeforeUnloadListener(this);
@@ -187,23 +187,17 @@ export default class NoteDetailWidget extends NoteContextAwareWidget {
 
         let type = note.type;
 
-        if (type === 'text' && await this.noteContext.isReadOnly()) {
-            type = 'readOnlyText';
-        }
-
-        if ((type === 'code' || type === 'mermaid') && await this.noteContext.isReadOnly()) {
+        if (type === 'text' && this.noteContext.viewScope.viewMode === 'source') {
             type = 'readOnlyCode';
-        }
-
-        if (type === 'text') {
+        } else if (type === 'text' && await this.noteContext.isReadOnly()) {
+            type = 'readOnlyText';
+        } else if ((type === 'code' || type === 'mermaid') && await this.noteContext.isReadOnly()) {
+            type = 'readOnlyCode';
+        } else if (type === 'text') {
             type = 'editableText';
-        }
-
-        if (type === 'code' || type === 'mermaid') {
+        } else if (type === 'code' || type === 'mermaid') {
             type = 'editableCode';
-        }
-
-        if (type === 'launcher') {
+        } else if (type === 'launcher') {
             type = 'doc';
         }
 
@@ -234,6 +228,15 @@ export default class NoteDetailWidget extends NoteContextAwareWidget {
         if (this.isNoteContext(ntxIds)) {
             await this.spacedUpdate.updateNowIfNecessary();
         }
+    }
+
+    async runActiveNoteCommand(params) {
+        if (this.isNoteContext(params.ntxId)) {
+            // make sure that script is saved before running it #4028
+            await this.spacedUpdate.updateNowIfNecessary();
+        }
+
+        return await this.parent.triggerCommand('runActiveNote', params);
     }
 
     async printActiveNoteEvent() {
@@ -316,7 +319,7 @@ export default class NoteDetailWidget extends NoteContextAwareWidget {
 
             const relation = attrs.find(attr =>
                 attr.type === 'relation'
-                && ['template', 'renderNote'].includes(attr.name)
+                && ['template', 'inherit', 'renderNote'].includes(attr.name)
                 && attributeService.isAffecting(attr, this.note));
 
             if (label || relation) {

@@ -1,12 +1,11 @@
 import ws from './ws.js';
 import utils from './utils.js';
-import server from './server.js';
 import froca from './froca.js';
 import hoistedNoteService from '../services/hoisted_note.js';
 import appContext from "../components/app_context.js";
 
 /**
- * @return {string|null}
+ * @returns {string|null}
  */
 async function resolveNotePath(notePath, hoistedNoteId = 'root') {
     const runPath = await resolveNotePathToSegments(notePath, hoistedNoteId);
@@ -19,7 +18,7 @@ async function resolveNotePath(notePath, hoistedNoteId = 'root') {
  * notePath as possible. Part of the path might not be valid because of note moving (which causes
  * path change) or other corruption, in that case this will try to get some other valid path to the correct note.
  *
- * @return {string[]}
+ * @returns {string[]}
  */
 async function resolveNotePathToSegments(notePath, hoistedNoteId = 'root', logErrors = true) {
     utils.assertArguments(notePath);
@@ -59,7 +58,7 @@ async function resolveNotePathToSegments(notePath, hoistedNoteId = 'root', logEr
                 return;
             }
 
-            child.resortParents();
+            child.sortParents();
 
             const parents = child.getParentNotes();
 
@@ -80,14 +79,10 @@ async function resolveNotePathToSegments(notePath, hoistedNoteId = 'root', logEr
                         You can ignore this message as it is mostly harmless.`);
                 }
 
-                const someNotePath = getSomeNotePath(child, hoistedNoteId);
+                const bestNotePath = child.getBestNotePath(hoistedNoteId);
 
-                if (someNotePath) { // in case it's root the path may be empty
-                    const pathToRoot = someNotePath.split("/").reverse().slice(1);
-
-                    if (!pathToRoot.includes("root")) {
-                        pathToRoot.push('root');
-                    }
+                if (bestNotePath) {
+                    const pathToRoot = bestNotePath.reverse().slice(1);
 
                     for (const noteId of pathToRoot) {
                         effectivePathSegments.push(noteId);
@@ -110,29 +105,15 @@ async function resolveNotePathToSegments(notePath, hoistedNoteId = 'root', logEr
     else {
         const note = await froca.getNote(getNoteIdFromNotePath(notePath));
 
-        const someNotePathSegments = getSomeNotePathSegments(note, hoistedNoteId);
+        const bestNotePath = note.getBestNotePath(hoistedNoteId);
 
-        if (!someNotePathSegments) {
-            throw new Error(`Did not find any path segments for ${note.toString()}, hoisted note ${hoistedNoteId}`);
+        if (!bestNotePath) {
+            throw new Error(`Did not find any path segments for '${note.toString()}', hoisted note '${hoistedNoteId}'`);
         }
 
         // if there isn't actually any note path with hoisted note then return the original resolved note path
-        return someNotePathSegments.includes(hoistedNoteId) ? someNotePathSegments : effectivePathSegments;
+        return bestNotePath.includes(hoistedNoteId) ? bestNotePath : effectivePathSegments;
     }
-}
-
-function getSomeNotePathSegments(note, hoistedNotePath = 'root') {
-    utils.assertArguments(note);
-
-    const notePaths = note.getSortedNotePaths(hoistedNotePath);
-
-    return notePaths.length > 0 ? notePaths[0].notePath : null;
-}
-
-function getSomeNotePath(note, hoistedNotePath = 'root') {
-    const notePath = getSomeNotePathSegments(note, hoistedNotePath);
-
-    return notePath === null ? null : notePath.join('/');
 }
 
 ws.subscribeToMessages(message => {
@@ -312,16 +293,6 @@ function isNotePathInAddress() {
         || (notePath === '' && !!ntxId);
 }
 
-function parseNotePath(notePath) {
-    let noteIds = notePath.split('/');
-
-    if (noteIds[0] !== 'root') {
-        noteIds = ['root'].concat(noteIds);
-    }
-
-    return noteIds;
-}
-
 function isNotePathInHiddenSubtree(notePath) {
     return notePath?.includes("root/_hidden");
 }
@@ -329,8 +300,6 @@ function isNotePathInHiddenSubtree(notePath) {
 export default {
     resolveNotePath,
     resolveNotePathToSegments,
-    getSomeNotePath,
-    getSomeNotePathSegments,
     getParentProtectedStatus,
     getNotePath,
     getNoteIdFromNotePath,
@@ -341,6 +310,5 @@ export default {
     getNoteTitleWithPathAsSuffix,
     getHashValueFromAddress,
     isNotePathInAddress,
-    parseNotePath,
     isNotePathInHiddenSubtree
 };

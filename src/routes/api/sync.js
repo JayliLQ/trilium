@@ -21,7 +21,7 @@ async function testSync() {
 
         await syncService.login();
 
-        // login was successful so we'll kick off sync now
+        // login was successful, so we'll kick off sync now
         // this is important in case when sync server has been just initialized
         syncService.sync();
 
@@ -61,7 +61,7 @@ function checkSync() {
 function syncNow() {
     log.info("Received request to trigger sync now.");
 
-    // when explicitly asked for set in progress status immediatelly for faster user feedback
+    // when explicitly asked for set in progress status immediately for faster user feedback
     ws.syncPullInProgress();
 
     return syncService.sync();

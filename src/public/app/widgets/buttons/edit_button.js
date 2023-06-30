@@ -5,7 +5,9 @@ import protectedSessionHolder from "../../services/protected_session_holder.js";
 
 export default class EditButton extends OnClickButtonWidget {
     isEnabled() {
-        return super.isEnabled() && this.note;
+        return super.isEnabled()
+            && this.note
+            && this.noteContext.viewScope.viewMode === 'default';
     }
 
     constructor() {
@@ -15,7 +17,7 @@ export default class EditButton extends OnClickButtonWidget {
             .title("Edit this note")
             .titlePlacement("bottom")
             .onClick(widget => {
-                this.noteContext.readOnlyTemporarilyDisabled = true;
+                this.noteContext.viewScope.readOnlyTemporarilyDisabled = true;
 
                 appContext.triggerEvent('readOnlyTemporarilyDisabled', {noteContext: this.noteContext});
 
@@ -56,7 +58,7 @@ export default class EditButton extends OnClickButtonWidget {
                 && attr.name.toLowerCase().includes("readonly")
                 && attributeService.isAffecting(attr, this.note)
         )) {
-            this.noteContext.readOnlyTemporarilyDisabled = false;
+            this.noteContext.viewScope.readOnlyTemporarilyDisabled = false;
 
             this.refresh();
         }

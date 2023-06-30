@@ -12,6 +12,14 @@ const TPL = `
         .excalidraw .App-menu_top .buttonList {
             display: flex;
         }
+        
+        /* Conflict between excalidraw and bootstrap classes keeps the menu hidden */
+        /* https://github.com/zadam/trilium/issues/3780 */
+        /* https://github.com/excalidraw/excalidraw/issues/6567 */
+        .excalidraw .dropdown-menu {
+            display: block;
+        }
+
 
         .excalidraw-wrapper {
             height: 100%;
@@ -70,7 +78,7 @@ const TPL = `
  *
  * Discussion of storing svg in the note:
  *  - Pro: we will combat bit-rot. Showing the SVG will be very fast and easy, since it is already there.
- *  - Con: The note will get bigger (~40-50%?), we will generate more bandwith. However, using trilium
+ *  - Con: The note will get bigger (~40-50%?), we will generate more bandwidth. However, using trilium
  *         desktop instance mitigates that issue.
  *
  * Roadmap:
@@ -144,7 +152,7 @@ export default class ExcalidrawTypeWidget extends TypeWidget {
     /**
      * called to populate the widget container with the note content
      *
-     * @param {note} note
+     * @param {FNote} note
      */
     async doRefresh(note) {
         // see if note changed, since we do not get a new class for a new note
@@ -219,7 +227,7 @@ export default class ExcalidrawTypeWidget extends TypeWidget {
                 collaborators: []
             };
 
-            // files are expected in an array when loading. they are stored as an key-index object
+            // files are expected in an array when loading. they are stored as a key-index object
             // see example for loading here:
             // https://github.com/excalidraw/excalidraw/blob/c5a7723185f6ca05e0ceb0b0d45c4e3fbcb81b2a/src/packages/excalidraw/example/App.js#L68
             const fileArray = [];
@@ -246,7 +254,7 @@ export default class ExcalidrawTypeWidget extends TypeWidget {
      * gets data from widget container that will be sent via spacedUpdate.scheduleUpdate();
      * this is automatically called after this.saveData();
      */
-    async getContent() {
+    async getData() {
         const elements = this.excalidrawRef.current.getSceneElements();
         const appState = this.excalidrawRef.current.getAppState();
 
@@ -277,6 +285,8 @@ export default class ExcalidrawTypeWidget extends TypeWidget {
         })
 
         const content = {
+            type: "excalidraw",
+            version: 2,
             _meta: "This note has type `canvas`. It uses excalidraw and stores an exported svg alongside.",
             elements, // excalidraw
             appState, // excalidraw
@@ -284,7 +294,9 @@ export default class ExcalidrawTypeWidget extends TypeWidget {
             svg: svgString, // not needed for excalidraw, used for note_short, content, and image api
         };
 
-        return JSON.stringify(content);
+        return {
+            content: JSON.stringify(content)
+        };
     }
 
     /**

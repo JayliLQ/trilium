@@ -3,9 +3,12 @@
 const becca = require("../../becca/becca");
 const { JSDOM } = require("jsdom");
 const NotFoundError = require("../../errors/not_found_error");
+function buildDescendantCountMap(noteIdsToCount) {
+    if (!Array.isArray(noteIdsToCount)) {
+        throw new Error('noteIdsToCount: type error');
+    }
 
-function buildDescendantCountMap() {
-    const noteIdToCountMap = {};
+    const noteIdToCountMap = Object.create(null);
 
     function getCount(noteId) {
         if (!(noteId in noteIdToCountMap)) {
@@ -24,12 +27,17 @@ function buildDescendantCountMap() {
 
         return noteIdToCountMap[noteId];
     }
-
-    getCount('root');
+    noteIdsToCount.forEach((noteId) => {
+        getCount(noteId);
+    });
 
     return noteIdToCountMap;
 }
-
+/**
+ * @param {BNote} note
+ * @param {int} depth
+ * @returns {string[]} noteIds
+ */
 function getNeighbors(note, depth) {
     if (depth === 0) {
         return [];
@@ -38,7 +46,7 @@ function getNeighbors(note, depth) {
     const retNoteIds = [];
 
     function isIgnoredRelation(relation) {
-        return ['relationMapLink', 'template', 'image', 'ancestor'].includes(relation.name);
+        return ['relationMapLink', 'template', 'inherit', 'image', 'ancestor'].includes(relation.name);
     }
 
     // forward links
@@ -114,7 +122,9 @@ function getLinkMap(req) {
         noteIds.add(noteId);
     }
 
-    const notes = Array.from(noteIds).map(noteId => {
+    const noteIdsArray = Array.from(noteIds)
+
+    const notes = noteIdsArray.map(noteId => {
         const note = becca.getNote(noteId);
 
         return [
@@ -126,7 +136,7 @@ function getLinkMap(req) {
     });
 
     const links = Object.values(becca.attributes).filter(rel => {
-        if (rel.type !== 'relation' || rel.name === 'relationMapLink' || rel.name === 'template') {
+        if (rel.type !== 'relation' || rel.name === 'relationMapLink' || rel.name === 'template' || rel.name === 'inherit') {
             return false;
         }
         else if (!noteIds.has(rel.noteId) || !noteIds.has(rel.value)) {
@@ -150,14 +160,14 @@ function getLinkMap(req) {
 
     return {
         notes: notes,
-        noteIdToDescendantCountMap: buildDescendantCountMap(),
+        noteIdToDescendantCountMap: buildDescendantCountMap(noteIdsArray),
         links: links
     };
 }
 
 function getTreeMap(req) {
     const mapRootNote = becca.getNote(req.params.noteId);
-    // if the map root itself has ignore (journal typically) then there wouldn't be anything to display so
+    // if the map root itself has ignore (journal typically) then there wouldn't be anything to display, so
     // we'll just ignore it
     const ignoreExcludeFromNoteMap = mapRootNote.hasLabel('excludeFromNoteMap');
     const subtree = mapRootNote.getSubtree({
@@ -204,7 +214,7 @@ function getTreeMap(req) {
         });
     }
 
-    const noteIdToDescendantCountMap = buildDescendantCountMap();
+    const noteIdToDescendantCountMap = buildDescendantCountMap(Array.from(noteIds));
 
     updateDescendantCountMapForSearch(noteIdToDescendantCountMap, subtree.relationships);
 
@@ -259,6 +269,7 @@ function findExcerpts(sourceNote, referencedNoteId) {
             centerEl = centerEl.parentElement;
         }
 
+        /** @var {HTMLElement[]} */
         const excerptEls = [centerEl];
         let excerptLength = centerEl.textContent.length;
         let left = centerEl;

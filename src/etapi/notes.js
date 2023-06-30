@@ -8,7 +8,7 @@ const v = require("./validators");
 const searchService = require("../services/search/services/search");
 const SearchContext = require("../services/search/search_context");
 const zipExportService = require("../services/export/zip");
-const noteRevisionService = require("../services/note_revisions.js");
+const zipImportService = require("../services/import/zip");
 
 function register(router) {
     eu.route(router, 'get', '/etapi/notes', (req, res, next) => {
@@ -123,7 +123,7 @@ function register(router) {
 
         note.setContent(req.body);
 
-        noteService.scanForLinks(note);
+        noteService.asyncPostProcessContent(note, req.body);
 
         return res.sendStatus(204);
     });
@@ -142,9 +142,19 @@ function register(router) {
         // (e.g. branchIds are not seen in UI), that we export "note export" instead.
         const branch = note.getParentBranches()[0];
 
-        console.log(note.getParentBranches());
-
         zipExportService.exportToZip(taskContext, branch, format, res);
+    });
+
+    eu.route(router, 'post' ,'/etapi/notes/:noteId/import', (req, res, next) => {
+        const note = eu.getAndCheckNote(req.params.noteId);
+        const taskContext = new TaskContext('no-progress-reporting');
+
+        zipImportService.importZip(taskContext, req.body, note).then(importedNote => {
+            res.status(201).json({
+                note: mappers.mapNoteToPojo(importedNote),
+                branch: mappers.mapBranchToPojo(importedNote.getBranches()[0]),
+            });
+        }); // we need better error handling here, async errors won't be properly processed.
     });
 
     eu.route(router, 'post' ,'/etapi/notes/:noteId/note-revision', (req, res, next) => {

@@ -74,6 +74,50 @@ export default class SplitNoteContainer extends FlexContainer {
         appContext.tabManager.removeNoteContext(ntxId);
     }
 
+    async moveThisNoteSplitCommand({ntxId, isMovingLeft}) {
+        if (!ntxId) {
+            logError("empty ntxId!");
+            return;
+        }
+
+        const contexts = appContext.tabManager.noteContexts;
+
+        const currentIndex = contexts.findIndex(c => c.ntxId === ntxId);
+        const leftIndex = isMovingLeft ? currentIndex - 1 : currentIndex;
+
+        if (currentIndex === -1 || leftIndex < 0 || leftIndex + 1 >= contexts.length) {
+            logError(`invalid context! currentIndex: ${currentIndex}, leftIndex: ${leftIndex}, contexts.length: ${contexts.length}`);
+            return;
+        }
+
+        if (contexts[leftIndex].isEmpty() && contexts[leftIndex + 1].isEmpty()) {
+            // no op
+            return;
+        }
+
+        const ntxIds = contexts.map(c => c.ntxId);
+        const newNtxIds = [
+            ...ntxIds.slice(0, leftIndex),
+            ntxIds[leftIndex + 1],
+            ntxIds[leftIndex],
+            ...ntxIds.slice(leftIndex + 2),
+        ];
+        const isChangingMainContext = !contexts[leftIndex].mainNtxId;
+
+        this.triggerCommand("noteContextReorder", {
+            ntxIdsInOrder: newNtxIds,
+            oldMainNtxId: isChangingMainContext ? ntxIds[leftIndex] : null,
+            newMainNtxId: isChangingMainContext ? ntxIds[leftIndex + 1]: null,
+        });
+
+        // reorder the note context widgets
+        this.$widget.find(`[data-ntx-id="${ntxIds[leftIndex]}"]`)
+            .insertAfter(this.$widget.find(`[data-ntx-id="${ntxIds[leftIndex + 1]}"]`));
+
+        // activate context that now contains the original note
+        await appContext.tabManager.activateNoteContext(isMovingLeft ? ntxIds[leftIndex + 1] : ntxIds[leftIndex]);
+    }
+
     activeContextChangedEvent() {
         this.refresh();
     }
@@ -112,7 +156,7 @@ export default class SplitNoteContainer extends FlexContainer {
 
     /**
      * widget.hasBeenAlreadyShown is intended for lazy loading of cached tabs - initial note switches of new tabs
-     * are not executed, we're waiting for the first tab activation and then we update the tab. After this initial
+     * are not executed, we're waiting for the first tab activation, and then we update the tab. After this initial
      * activation further note switches are always propagated to the tabs.
      */
     handleEventInChildren(name, data) {

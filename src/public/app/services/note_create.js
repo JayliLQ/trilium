@@ -1,5 +1,4 @@
 import appContext from "../components/app_context.js";
-import utils from "./utils.js";
 import protectedSessionHolder from "./protected_session_holder.js";
 import server from "./server.js";
 import ws from "./ws.js";
@@ -15,7 +14,7 @@ async function createNote(parentNotePath, options = {}) {
     }, options);
 
     // if isProtected isn't available (user didn't enter password yet), then note is created as unencrypted
-    // but this is quite weird since user doesn't see WHERE the note is being created so it shouldn't occur often
+    // but this is quite weird since user doesn't see WHERE the note is being created, so it shouldn't occur often
     if (!options.isProtected || !protectedSessionHolder.isProtectedSessionAvailable()) {
         options.isProtected = false;
     }
@@ -100,7 +99,7 @@ function parseSelectedHtml(selectedHtml) {
 
     if (dom.length > 0 && dom[0].tagName && dom[0].tagName.match(/h[1-6]/i)) {
         const title = $(dom[0]).text();
-        // remove the title from content (only first occurence)
+        // remove the title from content (only first occurrence)
         const content = selectedHtml.replace(dom[0].outerHTML, "");
 
         return [title, content];

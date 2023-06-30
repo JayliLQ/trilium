@@ -96,7 +96,13 @@ export default class TabManager extends Component {
 
             await this.tabsUpdate.allowUpdateWithoutChange(async () => {
                 for (const tab of filteredTabs) {
-                    await this.openContextWithNote(tab.notePath, tab.active, tab.ntxId, tab.hoistedNoteId, tab.mainNtxId);
+                    await this.openContextWithNote(tab.notePath, {
+                        activate: tab.active,
+                        ntxId: tab.ntxId,
+                        mainNtxId: tab.mainNtxId,
+                        hoistedNoteId: tab.hoistedNoteId,
+                        viewMode: tab.viewMode
+                    });
                 }
             });
 
@@ -179,7 +185,7 @@ export default class TabManager extends Component {
         return activeContext ? activeContext.notePath : null;
     }
 
-    /** @returns {NoteShort} */
+    /** @returns {FNote} */
     getActiveContextNote() {
         const activeContext = this.getActiveContext();
         return activeContext ? activeContext.note : null;
@@ -277,14 +283,24 @@ export default class TabManager extends Component {
             }
         }
 
-        return this.openContextWithNote(notePath, activate, null, hoistedNoteId);
+        return this.openContextWithNote(notePath, { activate, hoistedNoteId });
     }
 
-    async openContextWithNote(notePath, activate, ntxId = null, hoistedNoteId = 'root', mainNtxId = null) {
+    async openContextWithNote(notePath, opts = {}) {
+        const activate = !!opts.activate;
+        const ntxId = opts.ntxId || null;
+        const mainNtxId = opts.mainNtxId || null;
+        const hoistedNoteId = opts.hoistedNoteId || 'root';
+        const viewMode = opts.viewMode || "default";
+
         const noteContext = await this.openEmptyTab(ntxId, hoistedNoteId, mainNtxId);
 
         if (notePath) {
-            await noteContext.setNote(notePath, !activate); // if activate is false then send normal noteSwitched event
+            await noteContext.setNote(notePath, {
+                // if activate is false then send normal noteSwitched event
+                triggerSwitchEvent: !activate,
+                viewMode: viewMode
+            });
         }
 
         if (activate) {
@@ -310,7 +326,7 @@ export default class TabManager extends Component {
 
         // if no tab with this note has been found we'll create new tab
 
-        await this.openContextWithNote(noteId, true);
+        await this.openContextWithNote(noteId, { activate: true });
     }
 
     async activateNoteContext(ntxId, triggerEvent = true) {
@@ -372,7 +388,12 @@ export default class TabManager extends Component {
             await this.triggerEvent('beforeNoteContextRemove', { ntxIds: ntxIdsToRemove });
 
             if (!noteContextToRemove.isMainContext()) {
-                await this.activateNoteContext(noteContextToRemove.getMainContext().ntxId);
+                const siblings = noteContextToRemove.getMainContext().getSubContexts();
+                const idx = siblings.findIndex(nc => nc.ntxId === noteContextToRemove.ntxId);
+                const contextToActivateIdx = idx === siblings.length - 1 ? idx - 1 : idx + 1;
+                const contextToActivate = siblings[contextToActivateIdx];
+
+                await this.activateNoteContext(contextToActivate.ntxId);
             }
             else if (this.mainNoteContexts.length <= 1) {
                 await this.openAndActivateEmptyTab();
@@ -430,15 +451,22 @@ export default class TabManager extends Component {
         this.tabsUpdate.scheduleUpdate();
     }
 
-    noteContextReorderEvent({ntxIdsInOrder}) {
-        const order = {};
-        let i = 0;
-
-        for (const ntxId of ntxIdsInOrder) {
-            order[ntxId] = i++;
-        }
+    noteContextReorderEvent({ntxIdsInOrder, oldMainNtxId, newMainNtxId}) {
+        const order = Object.fromEntries(ntxIdsInOrder.map((v, i) => [v, i]));
 
         this.children.sort((a, b) => order[a.ntxId] < order[b.ntxId] ? -1 : 1);
+
+        if (oldMainNtxId && newMainNtxId) {
+            this.children.forEach(c => {
+                if (c.ntxId === newMainNtxId) {
+                    // new main context has null mainNtxId
+                    c.mainNtxId = null;
+                } else if (c.ntxId === oldMainNtxId || c.mainNtxId === oldMainNtxId) {
+                    // old main context or subcontexts all have the new mainNtxId
+                    c.mainNtxId = newMainNtxId;
+                }
+            });
+        }
 
         this.tabsUpdate.scheduleUpdate();
     }

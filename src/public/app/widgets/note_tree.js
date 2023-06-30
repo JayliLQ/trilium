@@ -19,7 +19,6 @@ import options from "../services/options.js";
 import protectedSessionHolder from "../services/protected_session_holder.js";
 import dialogService from "../services/dialog.js";
 import shortcutService from "../services/shortcuts.js";
-import LauncherContextMenu from "../menus/launcher_context_menu.js";
 
 const TPL = `
 <div class="tree-wrapper">
@@ -42,7 +41,6 @@ const TPL = `
     }
     
     .tree-actions {
-        padding: 4px 0;
         background-color: var(--launcher-pane-background-color);
         z-index: 100;
         position: absolute;
@@ -50,13 +48,15 @@ const TPL = `
         display: flex;
         align-items: flex-end;
         justify-content: flex-end;
-        right: 11.77px;
+        right: 17px;
+        border-radius: 7px;
+        border: 1px solid var(--main-border-color);
     }
     
     button.tree-floating-button {
+        margin: 1px;
         font-size: 1.5em;
         padding: 5px;
-        margin-right: 5px;
         max-height: 34px;
         color: var(--launcher-pane-text-color);
         background-color: var(--button-background-color);
@@ -148,6 +148,9 @@ const TPL = `
 
 const MAX_SEARCH_RESULTS_IN_TREE = 100;
 
+// this has to be hanged on the actual elements to effectively intercept and stop click event
+const cancelClickPropagation = e => e.stopPropagation();
+
 export default class NoteTreeWidget extends NoteContextAwareWidget {
     constructor() {
         super();
@@ -223,7 +226,7 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
             return false;
         });
 
-        this.$treeSettingsPopup.on("click", e => { e.stopPropagation(); });
+        this.$treeSettingsPopup.on("click", e => {e.stopPropagation();});
 
         $(document).on('click', () => this.$treeSettingsPopup.hide());
 
@@ -251,12 +254,12 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
 
         // code inspired by https://gist.github.com/jtsternberg/c272d7de5b967cec2d3d
         const isEnclosing = ($container, $sub) => {
-            const conOffset           = $container.offset();
-            const conDistanceFromTop  = conOffset.top + $container.outerHeight(true);
+            const conOffset = $container.offset();
+            const conDistanceFromTop = conOffset.top + $container.outerHeight(true);
             const conDistanceFromLeft = conOffset.left + $container.outerWidth(true);
 
-            const subOffset           = $sub.offset();
-            const subDistanceFromTop  = subOffset.top + $sub.outerHeight(true);
+            const subOffset = $sub.offset();
+            const subDistanceFromTop = subOffset.top + $sub.outerHeight(true);
             const subDistanceFromLeft = subOffset.left + $sub.outerWidth(true);
 
             return conDistanceFromTop > subDistanceFromTop
@@ -559,7 +562,8 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
                 const isHoistedNote = activeNoteContext && activeNoteContext.hoistedNoteId === note.noteId && note.noteId !== 'root';
 
                 if (isHoistedNote) {
-                    const $unhoistButton = $('<span class="tree-item-button unhoist-button bx bx-door-open" title="Unhoist"></span>');
+                    const $unhoistButton = $('<span class="tree-item-button unhoist-button bx bx-door-open" title="Unhoist"></span>')
+                        .on("click", cancelClickPropagation);
 
                     // unhoist button is prepended since compared to other buttons this is not just convenience
                     // on the mobile interface - it's the only way to unhoist
@@ -567,19 +571,22 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
                 }
 
                 if (note.hasLabel('workspace') && !isHoistedNote) {
-                    const $enterWorkspaceButton = $('<span class="tree-item-button enter-workspace-button bx bx-door-open" title="Hoist this note (workspace)"></span>');
+                    const $enterWorkspaceButton = $('<span class="tree-item-button enter-workspace-button bx bx-door-open" title="Hoist this note (workspace)"></span>')
+                        .on("click", cancelClickPropagation);
 
                     $span.append($enterWorkspaceButton);
                 }
 
                 if (note.type === 'search') {
-                    const $refreshSearchButton = $('<span class="tree-item-button refresh-search-button bx bx-refresh" title="Refresh saved search results"></span>');
+                    const $refreshSearchButton = $('<span class="tree-item-button refresh-search-button bx bx-refresh" title="Refresh saved search results"></span>')
+                        .on("click", cancelClickPropagation);
 
                     $span.append($refreshSearchButton);
                 }
 
                 if (!['search', 'launcher'].includes(note.type) && !note.isOptions() && !note.isLaunchBarConfig()) {
-                    const $createChildNoteButton = $('<span class="tree-item-button add-note-button bx bx-plus" title="Create child note"></span>');
+                    const $createChildNoteButton = $('<span class="tree-item-button add-note-button bx bx-plus" title="Create child note"></span>')
+                        .on("click", cancelClickPropagation);
 
                     $span.append($createChildNoteButton);
                 }
@@ -641,7 +648,7 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
     }
 
     /**
-     * @param {NoteShort} parentNote
+     * @param {FNote} parentNote
      */
     prepareChildren(parentNote) {
         utils.assertArguments(parentNote);
@@ -673,7 +680,7 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
         return noteList;
     }
 
-    updateNode(node) {
+    async updateNode(node) {
         const note = froca.getNoteFromCache(node.data.noteId);
         const branch = froca.getBranch(node.data.branchId);
 
@@ -697,14 +704,14 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
         node.title = utils.escapeHtml(title);
 
         if (node.isExpanded() !== branch.isExpanded) {
-            node.setExpanded(branch.isExpanded, {noEvents: true, noAnimation: true});
+            await node.setExpanded(branch.isExpanded, {noEvents: true, noAnimation: true});
         }
 
         node.renderTitle();
     }
 
     /**
-     * @param {Branch} branch
+     * @param {FBranch} branch
      * @param {boolean} forceLazy
      */
     prepareNode(branch, forceLazy = false) {
@@ -834,11 +841,7 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
 
         await this.filterHoistedBranch();
 
-        const activeNode = await this.getNodeFromPath(appContext.tabManager.getActiveContextNotePath());
-
-        if (activeNode) {
-            activeNode.setActive({noEvents: true, noFocus: false});
-        }
+        // don't activate the active note, see discussion in https://github.com/zadam/trilium/issues/3664
     }
 
     async expandTree(node = null) {
@@ -849,10 +852,10 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
         await this.setExpandedStatusForSubtree(node, false);
     }
 
-    collapseTreeEvent() { this.collapseTree(); }
+    collapseTreeEvent() {this.collapseTree();}
 
     /**
-     * @return {FancytreeNode|null}
+     * @returns {FancytreeNode|null}
      */
     getActiveNode() {
         return this.tree.getActiveNode();
@@ -861,7 +864,7 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
     /**
      * focused & not active node can happen during multiselection where the node is selected
      * but not activated (its content is not displayed in the detail)
-     * @return {FancytreeNode|null}
+     * @returns {FancytreeNode|null}
      */
     getFocusedNode() {
         return this.tree.getFocusNode();
@@ -920,19 +923,21 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
                 }
 
                 if (expand) {
-                    await parentNode.setExpanded(true, {noAnimation: true});
+                    if (!parentNode.isExpanded()) {
+                        await parentNode.setExpanded(true, {noAnimation: true});
+                    }
 
-                    // although previous line should set the expanded status, it seems to happen asynchronously
+                    // although previous line should set the expanded status, it seems to happen asynchronously,
                     // so we need to make sure it is set properly before calling updateNode which uses this flag
                     const branch = froca.getBranch(parentNode.data.branchId);
                     branch.isExpanded = true;
                 }
 
-                this.updateNode(parentNode);
+                await this.updateNode(parentNode);
 
                 let foundChildNode = this.findChildNode(parentNode, childNoteId);
 
-                if (!foundChildNode) { // note might be recently created so we'll force reload and try again
+                if (!foundChildNode) { // note might be recently created, so we'll force reload and try again
                     await parentNode.load(true);
 
                     foundChildNode = this.findChildNode(parentNode, childNoteId);
@@ -940,7 +945,7 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
                     if (!foundChildNode) {
                         if (logErrors) {
                             // besides real errors this can be also caused by hiding of e.g. included images
-                            // these are real notes with real notePath, user can display them in a detail
+                            // these are real notes with real notePath, user can display them in a detail,
                             // but they don't have a node in the tree
 
                             const childNote = await froca.getNote(childNoteId);
@@ -997,21 +1002,21 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
         this.activityDetected();
 
         const oldActiveNode = this.getActiveNode();
-        let oldActiveNodeFocused = false;
 
-        if (oldActiveNode) {
-            oldActiveNodeFocused = oldActiveNode.hasFocus();
-
-            oldActiveNode.setActive(false);
-            oldActiveNode.setFocus(false);
-        }
-
-        if (this.noteContext
-            && this.noteContext.notePath
+        const newActiveNode = this.noteContext?.notePath
             && !this.noteContext.note?.isDeleted
             && (!treeService.isNotePathInHiddenSubtree(this.noteContext.notePath) || await hoistedNoteService.isHoistedInHiddenSubtree())
-        ) {
-            const newActiveNode = await this.getNodeFromPath(this.noteContext.notePath);
+            && await this.getNodeFromPath(this.noteContext.notePath);
+
+        if (newActiveNode !== oldActiveNode) {
+            let oldActiveNodeFocused = false;
+
+            if (oldActiveNode) {
+                oldActiveNodeFocused = oldActiveNode.hasFocus();
+
+                oldActiveNode.setActive(false);
+                oldActiveNode.setFocus(false);
+            }
 
             if (newActiveNode) {
                 if (!newActiveNode.isVisible()) {
@@ -1096,10 +1101,10 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
         const activeNode = this.getActiveNode();
         const activeNodeFocused = activeNode && activeNode.hasFocus();
         const nextNode = activeNode ? (activeNode.getNextSibling() || activeNode.getPrevSibling() || activeNode.getParent()) : null;
-        const activeNotePath = activeNode ? treeService.getNotePath(activeNode) : null;
+        let activeNotePath = activeNode ? treeService.getNotePath(activeNode) : null;
 
         const nextNotePath = nextNode ? treeService.getNotePath(nextNode) : null;
-        const activeNoteId = activeNode ? activeNode.data.noteId : null;
+        let activeNoteId = activeNode ? activeNode.data.noteId : null;
 
         const noteIdsToUpdate = new Set();
         const noteIdsToReload = new Set();
@@ -1126,7 +1131,7 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
                     }
                 }
             }
-            else if (ecAttr.type === 'relation' && ecAttr.name === 'template') {
+            else if (ecAttr.type === 'relation' && (ecAttr.name === 'template' || ecAttr.name === 'inherit')) {
                 // missing handling of things inherited from template
                 noteIdsToReload.add(ecAttr.noteId);
             }
@@ -1134,14 +1139,22 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
                 const note = froca.getNoteFromCache(ecAttr.noteId);
 
                 if (note && note.getChildNoteIds().includes(ecAttr.value)) {
-                    // there's new/deleted imageLink betwen note and its image child - which can show/hide
-                    // the image (if there is a imageLink relation between parent and child then it is assumed to be "contained" in the note and thus does not have to be displayed in the tree)
+                    // there's new/deleted imageLink between note and its image child - which can show/hide
+                    // the image (if there is a imageLink relation between parent and child
+                    // then it is assumed to be "contained" in the note and thus does not have to be displayed in the tree)
                     noteIdsToReload.add(ecAttr.noteId);
                 }
             }
         }
 
-        for (const ecBranch of loadResults.getBranches()) {
+        // activeNode is supposed to be moved when we find out activeNode is deleted but not all branches are deleted. save it for fixing activeNodePath after all nodes loaded.
+        let movedActiveNode = null;
+        let parentsOfAddedNodes = [];
+
+        const allBranches = loadResults.getBranches();
+        const allBranchesDeleted = allBranches.every(branch => !!branch.isDeleted);
+
+        for (const ecBranch of allBranches) {
             if (ecBranch.parentNoteId === '_share') {
                 // all shared notes have a sign in the tree, even the descendants of shared notes
                 noteIdsToReload.add(ecBranch.noteId);
@@ -1154,12 +1167,16 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
             for (const node of this.getNodesByBranch(ecBranch)) {
                 if (ecBranch.isDeleted) {
                     if (node.isActive()) {
-                        const newActiveNode = node.getNextSibling()
-                            || node.getPrevSibling()
-                            || node.getParent();
+                        if (allBranchesDeleted) {
+                            const newActiveNode = node.getNextSibling()
+                                || node.getPrevSibling()
+                                || node.getParent();
 
-                        if (newActiveNode) {
-                            newActiveNode.setActive(true, {noEvents: true, noFocus: true});
+                            if (newActiveNode) {
+                                newActiveNode.setActive(true, {noEvents: true, noFocus: true});
+                            }
+                        } else {
+                            movedActiveNode = node;
                         }
                     }
 
@@ -1173,12 +1190,13 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
 
             if (!ecBranch.isDeleted) {
                 for (const parentNode of this.getNodesByNoteId(ecBranch.parentNoteId)) {
+                    parentsOfAddedNodes.push(parentNode)
+
                     if (parentNode.isFolder() && !parentNode.isLoaded()) {
                         continue;
                     }
 
                     const found = (parentNode.getChildren() || []).find(child => child.data.noteId === ecBranch.noteId);
-
                     if (!found) {
                         // make sure it's loaded
                         await froca.getNote(ecBranch.noteId);
@@ -1221,7 +1239,18 @@ export default class NoteTreeWidget extends NoteContextAwareWidget {
         // for some reason node update cannot be in the batchUpdate() block (node is not re-rendered)
         for (const noteId of noteIdsToUpdate) {
             for (const node of this.getNodesByNoteId(noteId)) {
-                this.updateNode(node);
+                await this.updateNode(node);
+            }
+        }
+
+        if (movedActiveNode) {
+            for (const parentNode of parentsOfAddedNodes) {
+                const found = (parentNode.getChildren() || []).find(child => child.data.noteId === movedActiveNode.data.noteId);
+                if (found) {
+                    activeNotePath = treeService.getNotePath(found);
+                    activeNoteId = found.data.noteId;
+                    break
+                }
             }
         }
 

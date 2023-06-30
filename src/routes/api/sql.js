@@ -33,11 +33,17 @@ function execute(req) {
         for (let query of queries) {
             query = query.trim();
 
+            while (query.startsWith('-- ')) {
+                // Query starts with one or more SQL comments, discard these before we execute.
+                const pivot = query.indexOf('\n');
+                query = pivot > 0 ? query.substr(pivot + 1).trim() : "";
+            }
+            
             if (!query) {
                 continue;
             }
 
-            if (query.toLowerCase().startsWith('select')) {
+            if (query.toLowerCase().startsWith('select') || query.toLowerCase().startsWith('with')) {
                 results.push(sql.getRows(query));
             }
             else {

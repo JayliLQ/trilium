@@ -4,7 +4,6 @@ import mimeTypesService from '../../services/mime_types.js';
 import utils from "../../services/utils.js";
 import keyboardActionService from "../../services/keyboard_actions.js";
 import froca from "../../services/froca.js";
-import treeService from "../../services/tree.js";
 import noteCreateService from "../../services/note_create.js";
 import AbstractTextTypeWidget from "./abstract_text_type_widget.js";
 import link from "../../services/link.js";
@@ -52,7 +51,7 @@ const TPL = `
         cursor: text !important;
     }
     
-    .note-detail-editable-text *:not(figure):first-child {
+    .note-detail-editable-text *:not(figure,.include-note):first-child {
         margin-top: 0 !important;
     }
          
@@ -122,13 +121,13 @@ export default class EditableTextTypeWidget extends AbstractTextTypeWidget {
         this.watchdog = new EditorWatchdog(BalloonEditor, {
             // An average number of milliseconds between the last editor errors (defaults to 5000).
             // When the period of time between errors is lower than that and the crashNumberLimit
-            // is also reached, the watchdog changes its state to crashedPermanently and it stops
+            // is also reached, the watchdog changes its state to crashedPermanently, and it stops
             // restarting the editor. This prevents an infinite restart loop.
             minimumNonErrorTimePeriod: 5000,
             // A threshold specifying the number of errors (defaults to 3).
             // After this limit is reached and the time between last errors
             // is shorter than minimumNonErrorTimePeriod, the watchdog changes
-            // its state to crashedPermanently and it stops restarting the editor.
+            // its state to crashedPermanently, and it stops restarting the editor.
             // This prevents an infinite restart loop.
             crashNumberLimit: 3,
             // A minimum number of milliseconds between saving the editor data internally (defaults to 5000).
@@ -186,17 +185,18 @@ export default class EditableTextTypeWidget extends AbstractTextTypeWidget {
     async doRefresh(note) {
         const noteComplement = await froca.getNoteComplement(note.noteId);
 
-        await this.spacedUpdate.allowUpdateWithoutChange(() => {
-            this.watchdog.editor.setData(noteComplement.content || "");
-        });
+        await this.spacedUpdate.allowUpdateWithoutChange(() =>
+            this.watchdog.editor.setData(noteComplement.content || ""));
     }
 
-    getContent() {
+    getData() {
         const content = this.watchdog.editor.getData();
 
         // if content is only tags/whitespace (typically <p>&nbsp;</p>), then just make it empty
         // this is important when setting new note to code
-        return utils.isHtmlEmpty(content) ? '' : content;
+        return {
+            content: utils.isHtmlEmpty(content) ? '' : content
+        };
     }
 
     focus() {
@@ -376,7 +376,7 @@ export default class EditableTextTypeWidget extends AbstractTextTypeWidget {
             return;
         }
 
-        return treeService.getSomeNotePath(resp.note);
+        return resp.note.getBestNotePathString();
     }
 
     async refreshIncludedNoteEvent({noteId}) {

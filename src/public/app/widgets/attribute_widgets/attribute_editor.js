@@ -7,7 +7,6 @@ import libraryLoader from "../../services/library_loader.js";
 import froca from "../../services/froca.js";
 import attributeRenderer from "../../services/attribute_renderer.js";
 import noteCreateService from "../../services/note_create.js";
-import treeService from "../../services/tree.js";
 import attributeService from "../../services/attributes.js";
 
 const HELP_TEXT = `
@@ -346,6 +345,7 @@ export default class AttributeEditorWidget extends NoteContextAwareWidget {
 
         this.$editor.on("click", e => this.handleEditorClick(e));
 
+        /** @property {BalloonEditor} */
         this.textEditor = await BalloonEditor.create(this.$editor[0], editorConfig);
         this.textEditor.model.document.on('change:data', () => this.dataChanged());
         this.textEditor.editing.view.document.on('enter', (event, data) => {
@@ -502,7 +502,7 @@ export default class AttributeEditorWidget extends NoteContextAwareWidget {
             title: title
         });
 
-        return treeService.getSomeNotePath(note);
+        return note.getBestNotePathString();
     }
 
     async updateAttributeList(attributes) {

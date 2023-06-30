@@ -10,7 +10,6 @@ const becca = require('../../../becca/becca');
 const beccaService = require('../../../becca/becca_service');
 const utils = require('../../utils');
 const log = require('../../log');
-const scriptService = require("../../script");
 const hoistedNoteService = require("../../hoisted_note");
 
 function searchFromNote(note) {
@@ -73,7 +72,8 @@ function searchFromRelation(note, relationName) {
         return [];
     }
 
-    const result = scriptService.executeNote(scriptNote, { originEntity: note });
+    const scriptService = require("../../script"); // to avoid circular dependency
+    const result = scriptService.executeNote(scriptNote, {originEntity: note});
 
     if (!Array.isArray(result)) {
         log.info(`Result from ${scriptNote.noteId} is not an array.`);
@@ -139,7 +139,7 @@ function loadNeededInfoFromDatabase() {
 /**
  * @param {Expression} expression
  * @param {SearchContext} searchContext
- * @return {SearchResult[]}
+ * @returns {SearchResult[]}
  */
 function findResultsWithExpression(expression, searchContext) {
     if (searchContext.dbLoadNeeded) {
@@ -155,20 +155,16 @@ function findResultsWithExpression(expression, searchContext) {
     const noteSet = expression.execute(allNoteSet, executionContext, searchContext);
 
     const searchResults = noteSet.notes
+        .filter(note => !note.isDeleted)
         .map(note => {
-            if (note.isDeleted) {
-                return null;
-            }
-
-            const notePathArray = executionContext.noteIdToNotePath[note.noteId] || beccaService.getSomePath(note);
+            const notePathArray = executionContext.noteIdToNotePath[note.noteId] || note.getBestNotePath();
 
             if (!notePathArray) {
                 throw new Error(`Can't find note path for note ${JSON.stringify(note.getPojo())}`);
             }
 
             return new SearchResult(notePathArray);
-        })
-        .filter(note => !!note);
+        });
 
     for (const res of searchResults) {
         res.computeScore(searchContext.fulltextQuery, searchContext.highlightedTokens);
@@ -231,7 +227,8 @@ function parseQueryToExpression(query, searchContext) {
 
 /**
  * @param {string} query
- * @return {Note[]}
+ * @param {object} params - see SearchContext
+ * @returns {BNote[]}
  */
 function searchNotes(query, params = {}) {
     const searchResults = findResultsWithQuery(query, new SearchContext(params));
@@ -242,7 +239,7 @@ function searchNotes(query, params = {}) {
 /**
  * @param {string} query
  * @param {SearchContext} searchContext
- * @return {SearchResult[]}
+ * @returns {SearchResult[]}
  */
 function findResultsWithQuery(query, searchContext) {
     query = query || "";
@@ -260,7 +257,7 @@ function findResultsWithQuery(query, searchContext) {
 /**
  * @param {string} query
  * @param {SearchContext} searchContext
- * @return {Note|null}
+ * @returns {BNote|null}
  */
 function findFirstNoteWithQuery(query, searchContext) {
     const searchResults = findResultsWithQuery(query, searchContext);
@@ -291,7 +288,7 @@ function searchNotesForAutocomplete(query) {
             noteTitle: beccaService.getNoteTitle(result.noteId),
             notePathTitle: result.notePathTitle,
             highlightedNotePathTitle: result.highlightedNotePathTitle
-        }
+        };
     });
 }
 
@@ -302,15 +299,17 @@ function highlightSearchResults(searchResults, highlightedTokens) {
     // which would make the resulting HTML string invalid.
     // { and } are used for marking <b> and </b> tag (to avoid matches on single 'b' character)
     // < and > are used for marking <small> and </small>
-    highlightedTokens = highlightedTokens.map(token => token.replace('/[<\{\}]/g', ''));
+    highlightedTokens = highlightedTokens
+        .map(token => token.replace('/[<\{\}]/g', ''))
+        .filter(token => !!token?.trim());
 
-    // sort by the longest so we first highlight longest matches
+    // sort by the longest, so we first highlight the longest matches
     highlightedTokens.sort((a, b) => a.length > b.length ? -1 : 1);
 
     for (const result of searchResults) {
         const note = becca.notes[result.noteId];
 
-        result.highlightedNotePathTitle = result.notePathTitle.replace('/[<\{\}]/g', '');
+        result.highlightedNotePathTitle = result.notePathTitle.replace(/[<{}]/g, '');
 
         if (highlightedTokens.find(token => note.type.includes(token))) {
             result.highlightedNotePathTitle += ` "type: ${note.type}'`;
@@ -334,6 +333,11 @@ function highlightSearchResults(searchResults, highlightedTokens) {
     }
 
     for (const token of highlightedTokens) {
+        if (!token) {
+            // Avoid empty tokens, which might cause an infinite loop.
+            continue;
+        }
+
         for (const result of searchResults) {
             // Reset token
             const tokenRegex = new RegExp(utils.escapeRegExp(token), "gi");
@@ -366,7 +370,7 @@ function formatAttribute(attr) {
         let label = `#${utils.escapeHtml(attr.name)}`;
 
         if (attr.value) {
-            const val = /[^\w_-]/.test(attr.value) ? `"${attr.value}"` : attr.value;
+            const val = /[^\w-]/.test(attr.value) ? `"${attr.value}"` : attr.value;
 
             label += `=${utils.escapeHtml(val)}`;
         }

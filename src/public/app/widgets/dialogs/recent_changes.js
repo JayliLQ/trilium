@@ -1,13 +1,13 @@
 import linkService from '../../services/link.js';
 import utils from '../../services/utils.js';
 import server from '../../services/server.js';
-import treeService from "../../services/tree.js";
 import froca from "../../services/froca.js";
 import appContext from "../../components/app_context.js";
 import hoistedNoteService from "../../services/hoisted_note.js";
 import BasicWidget from "../basic_widget.js";
 import dialogService from "../../services/dialog.js";
 import toastService from "../../services/toast.js";
+import ws from "../../services/ws.js";
 
 const TPL = `
 <div class="recent-changes-dialog modal fade mx-auto" tabindex="-1" role="dialog">
@@ -94,7 +94,7 @@ export default class RecentChangesDialog extends BasicWidget {
 
                                     this.$widget.modal('hide');
 
-                                    await froca.reloadNotes([change.noteId]);
+                                    await ws.waitForMaxKnownEntityChangeId();
 
                                     appContext.tabManager.getActiveContext().setNote(change.noteId);
                                 }
@@ -107,7 +107,7 @@ export default class RecentChangesDialog extends BasicWidget {
                     }
                 } else {
                     const note = await froca.getNote(change.noteId);
-                    const notePath = treeService.getSomeNotePath(note);
+                    const notePath = note.getBestNotePathString();
 
                     if (notePath) {
                         $noteLink = await linkService.createNoteLink(notePath, {
